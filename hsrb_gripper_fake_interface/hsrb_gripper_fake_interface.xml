@@ -1,0 +1,10 @@
+<library path="hsrb_gripper_fake_interface">
+  <class name="hsrb_gripper_fake_interface/HsrbGripperFakeInterface"
+         type="hsrb_gripper_fake_interface::HsrbGripperFakeInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      Gripper Controller for Simulator
+    </description>
+  </class>
+</library>
+

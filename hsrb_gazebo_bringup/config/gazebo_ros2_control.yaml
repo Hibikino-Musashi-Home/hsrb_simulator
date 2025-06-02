@@ -49,6 +49,7 @@ hrh_gripper_controller:
 
 omni_base_controller:
   ros__parameters:
+    use_base_roll_velocity: true
     model_node_name: whole_body/robot_state_publisher
     joints:
       l_wheel: base_l_drive_wheel_joint

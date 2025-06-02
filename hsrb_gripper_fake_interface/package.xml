@@ -1,0 +1,18 @@
+<package format="3">
+  <name>hsrb_gripper_fake_interface</name>
+  <version>2.2.0</version>
+  <description>hsrb_gripper_interface for simulator</description>
+
+  <maintainer email="xr-hsr-support@mail.toyota.co.jp">HSR Support</maintainer>
+
+  <license>BSD 3-clause Clear License</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>hardware_interface</depend>
+  <depend>rclcpp</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
