@@ -65,35 +65,35 @@ class HsrbGripperFakeInterface : public hardware_interface::SystemInterface {
   // hand joint name
   std::string joint_name_;
 
-  // position current position
+  // current position
   double state_position_;
-  // velocity current position
+  // current velocity
   double state_velocity_;
-  // effort current position
+  // current effort
   double state_effort_;
-  // drive mode current value
+  // current drive mode value
   double state_drive_mode_;
-  // grasping flag current value
+  // current grasping flag value
   double state_grasping_flag_;
   // current value
   double state_current_;
 
-  // position command value
+  // commanded position
   double command_position_;
-  // effort command value
+  // commanded effort
   double command_effort_;
-  // drive mode command value
+  // commanded drive mode value
   double command_drive_mode_;
-  // grasping flag command value
+  // commanded grasping flag value
   double command_grasping_flag_;
 
-  // previous cycle position command value
+  // previous cycle commanded position
   double previous_command_position_;
 
   // effort threshold
   double param_effort_min_;
 
-  // last time velocity was updated
+  // time of last velocity update
   rclcpp::Time last_velocity_update_time_;
 };
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2024 TOYOTA MOTOR CORPORATION
+# Copyright (c) 2025 TOYOTA MOTOR CORPORATION
 # All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted (subject to the limitations in the disclaimer
@@ -24,30 +24,14 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 # OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 # DAMAGE.
-# -*- coding: utf-8 -*-
-from nav_msgs.msg import Odometry
-import rclpy
-from rclpy.node import Node
+from launch import LaunchDescription
+
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import ThisLaunchFileDir
 
 
-class Relay(Node):
-
-    def __init__(self):
-        super().__init__('odom_relay')
-        self._publisher = self.create_publisher(Odometry, '~/output_odom', 1)
-        self._subscription = self.create_subscription(Odometry, '~/input_odom', self._callback, 1)
-
-    def _callback(self, msg):
-        self._publisher.publish(msg)
-
-
-def main():
-    rclpy.init()
-    relay = Relay()
-    rclpy.spin(relay)
-    relay.destroy_node()
-    rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
+def generate_launch_description():
+    return LaunchDescription([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/gazebo_bringup.launch.py']))])

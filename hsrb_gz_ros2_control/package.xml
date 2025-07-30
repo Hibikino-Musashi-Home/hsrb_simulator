@@ -1,0 +1,27 @@
+<package format="3">
+  <name>hsrb_gz_ros2_control</name>
+  <version>2.3.0</version>
+  <description>Gazebo ros2_controlパッケージは、HSRグリッパーの特定のハードウェアシミュレーションを含むros2_controlフレームワークを使用してシミュレートされたロボットを制御することを可能にします。</description>
+  <maintainer email="xr-hsr-support@mail.toyota.co.jp">HSR Support</maintainer>
+  <license>BSD 3-clause Clear License</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>gz_ros2_control</depend>
+  <depend>hardware_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>tmc_exxx_servo_motor_protocol</depend>
+  <depend>yaml_cpp_vendor</depend>
+
+  <depend>ignition-gazebo6</depend>
+  <depend>ignition-plugin</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -43,14 +43,14 @@ constexpr double KMaxFingerAngle = 70.0 * M_PI / 180.0;
 namespace hsrb_gripper_fake_interface {
 
 CallbackReturn HsrbGripperFakeInterface::on_init(const hardware_interface::HardwareInfo& hardware_info) {
-  // Execute initialization process of the parent class
+  // Perform initialization processing of the parent class
   if (SystemInterface::on_init(hardware_info) != CallbackReturn::SUCCESS) {
     return CallbackReturn::ERROR;
   }
-  // Retrieve the joint name of the hand as specified in ros2_control.rviz.xacro
+  // Acquire the joint name of the hand described in ros2_control.rviz.xacro
   joint_name_ = hardware_info.joints[0].name;
 
-  // Initialize various variables
+  // Initializing various variables
   command_position_ = 0.0;
   command_effort_ = 0.0;
   command_drive_mode_ = -1.0;
@@ -66,11 +66,11 @@ CallbackReturn HsrbGripperFakeInterface::on_init(const hardware_interface::Hardw
 
   last_velocity_update_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
-  // Obtain the threshold parameter for effort
+  // Acquire the threshold parameter for effort
   if (hardware_info.hardware_parameters.find("effort_min") != hardware_info.hardware_parameters.end()) {
     param_effort_min_ = std::stod(hardware_info.hardware_parameters.at("effort_min"));
   } else {
-     // If the parameter does not exist, use the threshold 0.011 which is the measured value of Unit 34
+     // If the parameter does not exist, use the threshold 0.011, which is the actual measurement value of unit 34
     param_effort_min_ = 0.011;
   }
 
@@ -78,7 +78,7 @@ CallbackReturn HsrbGripperFakeInterface::on_init(const hardware_interface::Hardw
 }
 
 std::vector<hardware_interface::StateInterface> HsrbGripperFakeInterface::export_state_interfaces() {
-  // Add each state information
+  // Add information for each state
   std::vector<hardware_interface::StateInterface> state_interfaces;
   // Add position information
   state_interfaces.emplace_back(
@@ -147,18 +147,18 @@ hardware_interface::return_type HsrbGripperFakeInterface::read(
 
 hardware_interface::return_type HsrbGripperFakeInterface::write(
     const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
-  // Retrieve grasp flag instruction and current state
+  // Obtain grasp flag instructions and current state
   const auto command_grasping_flag = static_cast<int>(command_grasping_flag_);
   const auto state_grasping_flag = static_cast<int>(state_grasping_flag_);
 
-  // There is a change in the grasp flag
+  // When there is a change in the grasp flag
   if (command_grasping_flag != state_grasping_flag) {
     // When the grasp flag is 1
     if (command_grasping_flag == 1) {
-      // The operation is as follows based on effort value
+      // The operation is as follows based on the effort value:
       // 1. Absolute value of effort is greater than the threshold
-      //  1.1. If the effort value is positive: Fully open
-      //  1.2. If the effort value is negative: Fully close
+      //  1.1. When effort value is positive: Fully open
+      //  1.2. When effort value is negative: Fully closed
       if (fabs(command_effort_) > param_effort_min_) {
         if (command_effort_ > 0) {
           state_position_ = 1.0;
@@ -172,24 +172,24 @@ hardware_interface::return_type HsrbGripperFakeInterface::write(
     state_grasping_flag_ = command_grasping_flag_;
   }
 
-  // If there is a difference in value compared to the previous cycle, update the position value
+  // If there is a difference in value from the previous cycle, update the position value
   if (previous_command_position_ != command_position_) {
     state_position_ = std::max(KMinFingerAngle, std::min(KMaxFingerAngle, command_position_));
 
-    // Calculate velocity at the timing when position is updated
+    // Calculate the velocity at the timing when the position is updated
     state_velocity_ = (command_position_ - previous_command_position_)
                       / (time - last_velocity_update_time_).seconds();
     last_velocity_update_time_ = time;
   }
   previous_command_position_ = command_position_;
 
-  // Set velocity to 0 if it hasn't been updated for a certain amount of time
+  // Set velocity to 0 if it hasn't been updated for a certain period
   if ((time - last_velocity_update_time_).seconds() > 1.0) {
     state_velocity_ = 0.0;
   }
 
-  // Execute the update of drive mode
-  // However, since there is no drive_mode setting on the simulator side, only update the status
+  // Perform updates to drive mode
+  // However, since the simulator side does not have drive_mode settings, only update the status
   const auto command_drive_mode = static_cast<int>(command_drive_mode_);
   if (command_drive_mode >= 0) {
     state_drive_mode_ = command_drive_mode_;
