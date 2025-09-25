@@ -133,7 +133,7 @@ def gz_parameter_bridge_node(context: LaunchContext, args: dict):
         '/wrist_wrench/raw@geometry_msgs/msg/WrenchStamped[ignition.msgs.Wrench',
         '/hand_camera/color/image_rect_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/hand_camera/color/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-        '/hand_camera/depth/image_rect_raw@image_rect_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
+        '/hand_camera/depth/image@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/hand_camera/depth/camera_info@image_rect_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/head_l_stereo_camera/image_rect_color@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/head_l_stereo_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
@@ -141,7 +141,7 @@ def gz_parameter_bridge_node(context: LaunchContext, args: dict):
         '/head_r_stereo_camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
         '/head_rgbd_sensor/color/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/head_rgbd_sensor/color/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-        '/head_rgbd_sensor/depth/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
+        '/head_rgbd_sensor/depth/image@sensor_msgs/msg/Image[ignition.msgs.Image',
         '/head_rgbd_sensor/depth/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo'
     ]
 

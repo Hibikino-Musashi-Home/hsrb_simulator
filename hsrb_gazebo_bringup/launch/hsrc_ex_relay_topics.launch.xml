@@ -44,12 +44,12 @@ POSSIBILITY OF SUCH DAMAGE.
   <node_container namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="rclcpp_components" exec="component_container" name="nodelet_manager">
     <composable_node namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="depth_image_proc" plugin="depth_image_proc::ConvertMetricNode" name="convert_metric_node">
       <remap from="image_raw" to="$(var head_depth_topic_prefix)/image" />
-      <remap from="image" to="$(var head_depth_topic_prefix)/image_rect_raw" />
+      <remap from="image" to="$(var head_depth_topic_prefix)/image_raw" />
     </composable_node>
     <composable_node namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="depth_image_proc" plugin="depth_image_proc::PointCloudXyzrgbNode" name="point_cloud_xyzrgb_node">
-      <remap from="rgb/image_rect_color" to="$(var head_rgb_topic_prefix)/image_rect_raw" />
+      <remap from="rgb/image_rect_color" to="$(var head_rgb_topic_prefix)/image_raw" />
       <remap from="rgb/camera_info" to="$(var head_rgb_topic_prefix)/camera_info" />
-      <remap from="depth_registered/image_rect" to="$(var head_depth_topic_prefix)/image_rect_raw" />
+      <remap from="depth_registered/image_rect" to="$(var head_depth_topic_prefix)/image_raw" />
       <remap from="points" to="$(var head_depth_topic_prefix)/points" />
     </composable_node>
   </node_container>
@@ -85,12 +85,12 @@ POSSIBILITY OF SUCH DAMAGE.
   <node_container namespace="$(var relay_namespace)/hand_camera" pkg="rclcpp_components" exec="component_container" name="nodelet_manager">
     <composable_node namespace="$(var relay_namespace)/hand_camera" pkg="depth_image_proc" plugin="depth_image_proc::ConvertMetricNode" name="convert_metric_node">
       <remap from="image_raw" to="$(var hand_depth_topic_prefix)/image" />
-      <remap from="image" to="$(var hand_depth_topic_prefix)/image_raw" />
+      <remap from="image" to="$(var hand_depth_topic_prefix)/image_rect_raw" />
     </composable_node>
     <composable_node namespace="$(var relay_namespace)/hand_camera" pkg="depth_image_proc" plugin="depth_image_proc::PointCloudXyzrgbNode" name="point_cloud_xyzrgb_node">
-      <remap from="rgb/image_rect_color" to="$(var hand_rgb_topic_prefix)/image_rect_color" />
+      <remap from="rgb/image_rect_color" to="$(var hand_rgb_topic_prefix)/image_rect_raw" />
       <remap from="rgb/camera_info" to="$(var hand_rgb_topic_prefix)/camera_info" />
-      <remap from="depth_registered/image_rect" to="$(var hand_depth_topic_prefix)/image_raw" />
+      <remap from="depth_registered/image_rect" to="$(var hand_depth_topic_prefix)/image_rect_raw" />
       <remap from="points" to="$(var hand_rgb_topic_prefix)/points" />
     </composable_node>
   </node_container>
