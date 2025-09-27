@@ -1,0 +1,112 @@
+<!--
+Copyright (c) 2016, Toyota Motor Corporation
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+ * Neither the name of Toyota Motor Corporation nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+-->
+<launch>
+  <arg name="namespace" default="hsrb" />
+  <arg name="personal_name" default="" />
+  <arg name="use_sim_time" default="true" />
+
+  <let name="relay_namespace" value="" />
+
+  <let name="head_rgb_topic_prefix" value="$(var relay_namespace)/head_rgbd_sensor/color" />
+  <let name="head_depth_topic_prefix" value="$(var relay_namespace)/head_rgbd_sensor/depth" />
+  <let name="hand_rgb_topic_prefix" value="$(var relay_namespace)/hand_camera/color" />
+  <let name="hand_depth_topic_prefix" value="$(var relay_namespace)/hand_camera/depth" />
+  <let name="r_stereo_topic_prefix" value="$(var relay_namespace)/head_r_stereo_camera" />
+  <let name="l_stereo_topic_prefix" value="$(var relay_namespace)/head_l_stereo_camera" />
+
+  <!-- Head RGBD Sensor Component Container -->
+  <node_container namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="rclcpp_components" exec="component_container" name="nodelet_manager">
+    <composable_node namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="depth_image_proc" plugin="depth_image_proc::ConvertMetricNode" name="convert_metric_node">
+      <remap from="image_raw" to="$(var head_depth_topic_prefix)/image" />
+      <remap from="image" to="$(var head_depth_topic_prefix)/image_raw" />
+    </composable_node>
+    <composable_node namespace="$(var relay_namespace)/head_rgbd_sensor" pkg="depth_image_proc" plugin="depth_image_proc::PointCloudXyzrgbNode" name="point_cloud_xyzrgb_node">
+      <remap from="rgb/image_rect_color" to="$(var head_rgb_topic_prefix)/image_raw" />
+      <remap from="rgb/camera_info" to="$(var head_rgb_topic_prefix)/camera_info" />
+      <remap from="depth_registered/image_rect" to="$(var head_depth_topic_prefix)/image_raw" />
+      <remap from="points" to="$(var head_depth_topic_prefix)/points" />
+    </composable_node>
+  </node_container>
+
+  <!-- head rgb (Gemini 336L) -->
+  <!-- <node namespace="/$(var personal_name)" name="head_rgb_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var head_rgb_topic_prefix)/image_rect_color $(var head_rgb_topic_prefix)/image_raw">
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node> -->
+
+  <!-- head depth (Gemini 336L) -->
+  <!-- <node namespace="/$(var personal_name)" name="depth_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var head_depth_topic_prefix)/image_rect_raw $(var head_depth_topic_prefix)/image_raw" >
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node> -->
+
+  <!-- l_stereo -->
+  <node namespace="/$(var personal_name)" name="l_stereo_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var l_stereo_topic_prefix)/image_rect_color $(var l_stereo_topic_prefix)/image_raw" >
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node>
+  <!-- r_stereo -->
+  <node namespace="/$(var personal_name)" name="r_stereo_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var r_stereo_topic_prefix)/image_rect_color $(var r_stereo_topic_prefix)/image_raw" >
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node>
+
+  <!-- Hand RGBD Sensor Component Container -->
+  <node_container namespace="$(var relay_namespace)/hand_camera" pkg="rclcpp_components" exec="component_container" name="nodelet_manager">
+    <composable_node namespace="$(var relay_namespace)/hand_camera" pkg="depth_image_proc" plugin="depth_image_proc::ConvertMetricNode" name="convert_metric_node">
+      <remap from="image_raw" to="$(var hand_depth_topic_prefix)/image" />
+      <remap from="image" to="$(var hand_depth_topic_prefix)/image_rect_raw" />
+    </composable_node>
+    <composable_node namespace="$(var relay_namespace)/hand_camera" pkg="depth_image_proc" plugin="depth_image_proc::PointCloudXyzrgbNode" name="point_cloud_xyzrgb_node">
+      <remap from="rgb/image_rect_color" to="$(var hand_rgb_topic_prefix)/image_rect_raw" />
+      <remap from="rgb/camera_info" to="$(var hand_rgb_topic_prefix)/camera_info" />
+      <remap from="depth_registered/image_rect" to="$(var hand_depth_topic_prefix)/image_rect_raw" />
+      <remap from="points" to="$(var hand_rgb_topic_prefix)/points" />
+    </composable_node>
+  </node_container>
+
+  <!-- hand rgb (RealSense D405) -->
+  <!-- <node namespace="/$(var personal_name)" name="hand_rgb_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var hand_rgb_topic_prefix)/image_rect_color $(var hand_rgb_topic_prefix)/image_rect_raw">
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node> -->
+
+  <!-- hand depth (RealSense D405) -->
+  <!-- <node namespace="/$(var personal_name)" name="hand_depth_raw_image_pub" pkg="topic_tools" exec="relay"
+  args="$(var hand_depth_topic_prefix)/image_rect_raw $(var hand_depth_topic_prefix)/image_rect_raw" >
+    <param name="lazy" value="true" />
+    <param name="use_sim_time" value="$(var use_sim_time)" />
+  </node> -->
+
+</launch>
