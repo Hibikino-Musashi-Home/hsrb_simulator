@@ -1,0 +1,102 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 200
+
+    arm_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    head_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    omni_base_controller:
+      type: hsrc_ex_base_controllers/OmniBaseController
+    gripper_controller:
+      type: hsrb_gripper_controller/HrhGripperController
+
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - arm_lift_joint
+      - arm_flex_joint
+      - arm_roll_joint
+      - wrist_flex_joint
+      - wrist_roll_joint
+      - head_tilt_joint
+      - head_pan_joint
+      - base_l_drive_wheel_joint
+      - base_r_drive_wheel_joint
+      - base_roll_joint
+      - hand_motor_joint
+      - hand_l_spring_proximal_joint
+      - hand_r_spring_proximal_joint
+    interfaces:
+      - position
+      - velocity
+      - effort
+
+arm_trajectory_controller:
+  ros__parameters:
+    joints:
+      - arm_lift_joint
+      - arm_flex_joint
+      - arm_roll_joint
+      - wrist_flex_joint
+      - wrist_roll_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+    open_loop_control: True
+
+head_trajectory_controller:
+  ros__parameters:
+    joints:
+      - head_tilt_joint
+      - head_pan_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+    open_loop_control: True
+
+omni_base_controller:
+  ros__parameters:
+    use_base_roll_velocity: true
+    model_node_name: whole_body/robot_state_publisher
+    joints:
+      l_wheel: base_l_drive_wheel_joint
+      r_wheel: base_r_drive_wheel_joint
+      steer: base_roll_joint
+    wheel_odom_map_frame: odom
+    wheel_odom_base_frame: base_footprint_wheel
+    odometry_publish_rate: 50.0
+    transform_publish_rate: 50.0
+    yaw_velocity_limit: 5.0      # [rad/s]
+    wheel_velocity_limit: 35.0   # [rad/s]
+    base_coordinates: [odom_x, odom_y, odom_t]
+    odom_x:
+      p_gain: 1.0
+    odom_y:
+      p_gain: 1.0
+    odom_t:
+      p_gain: 1.0
+    use_sim_time: True
+    open_loop_control: True
+
+gripper_controller:
+  ros__parameters:
+    use_sim_time: True
+    model_node_name: whole_body/robot_state_publisher
+    joints:
+      - hand_motor_joint
+    position_goal_tolerance: 0.2
+    force_goal_tolerance: 10000.0
+    left_spring_joint: hand_l_spring_proximal_joint
+    right_spring_joint: hand_r_spring_proximal_joint
+    open_loop_control: true
+    distance_control_pgain: 2.0
+    distance_control_igain: 0.0
+    distance_control_dgain: 0.0
+    force_control_pgain: 0.3
+    force_control_igain: 0.05
+    force_control_dgain: 0.4
