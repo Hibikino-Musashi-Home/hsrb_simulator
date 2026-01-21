@@ -40,7 +40,7 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 
 
-# (h-yaguchi) Starting the controller with this method in humble
+# (h-yaguchi) In humble, the controller is launched using this method
 def create_spawner_node(controller_name, manager_name='/controller_manager'):
     return Node(package='controller_manager',
                 executable='spawner',
@@ -139,7 +139,7 @@ def launch_setup(context,
             '-Y',
             robot_pos_list[3]])
 
-    # The issues around here are similar to hsrb_bringup for the actual machine
+    # These issues are similar to those in hsrb_bringup for the actual machine
     # TODO(Takeshita) /robot_descriptionがあるべきなのでこうしたが，複数ロボット対応等が面倒になる
     joint_state_publisher = Node(package='joint_state_publisher',
                                  executable='joint_state_publisher',
@@ -168,8 +168,8 @@ def launch_setup(context,
         parameters=[{'laser_frame': 'base_range_sensor_link'},
                     {'publish_odom': 'laser_odom'}])
 
-    # Using gazebo_ros2_control makes remapping difficult, so relay
-    # ROS2 support for topic_tools itself is not finished
+    # Using gazebo_ros2_control makes remapping difficult, so relay is used
+    # ROS2 support for topic_tools itself is not yet complete
     odom_relay_node_gt = Node(package='hsrb_gazebo_bringup',
                               executable='odom_relay',
                               name='odom_relay',
@@ -194,7 +194,7 @@ def launch_setup(context,
                                              ('~/output_odom', 'odom')],
                                  condition=UnlessCondition(LaunchConfiguration('use_odom_ground_truth')))
 
-    # The issues around here are similar to hsrb_bringup for the actual machine
+    # These issues are similar to those in hsrb_bringup for the actual machine
     # TODO(Takeshita) /robot_descriptionがあるべきなのでこうしたが，複数ロボット対応等が面倒になる
     nodes = [laser_odom_node,
              joint_state_publisher,
