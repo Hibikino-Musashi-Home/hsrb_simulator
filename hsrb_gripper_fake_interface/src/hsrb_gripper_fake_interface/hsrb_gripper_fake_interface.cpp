@@ -36,21 +36,21 @@ DAMAGE.
 
 
 namespace {
-constexpr double KMinFingerAngle = -7.0 * M_PI / 180.0;
-constexpr double KMaxFingerAngle = 70.0 * M_PI / 180.0;
+constexpr double kMinFingerAngle = -7.0 * M_PI / 180.0;
+constexpr double kMaxFingerAngle = 70.0 * M_PI / 180.0;
 }  // namespace
 
 namespace hsrb_gripper_fake_interface {
 
 CallbackReturn HsrbGripperFakeInterface::on_init(const hardware_interface::HardwareInfo& hardware_info) {
-  // Perform initialization processing of the parent class
+  // Execute the initialization process of the parent class
   if (SystemInterface::on_init(hardware_info) != CallbackReturn::SUCCESS) {
     return CallbackReturn::ERROR;
   }
-  // Acquire the joint name of the hand described in ros2_control.rviz.xacro
+  // Retrieve the joint name of the hand described in ros2_control.rviz.xacro
   joint_name_ = hardware_info.joints[0].name;
 
-  // Initializing various variables
+  // Initialize various variables
   command_position_ = 0.0;
   command_effort_ = 0.0;
   command_drive_mode_ = -1.0;
@@ -66,11 +66,25 @@ CallbackReturn HsrbGripperFakeInterface::on_init(const hardware_interface::Hardw
 
   last_velocity_update_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
-  // Acquire the threshold parameter for effort
+  // Retrieve the threshold parameter for position
+  if (hardware_info.hardware_parameters.find("position_min") != hardware_info.hardware_parameters.end()) {
+    param_position_min_ = std::stod(hardware_info.hardware_parameters.at("position_min"));
+  } else {
+    param_position_min_ = kMinFingerAngle;
+  }
+  if (hardware_info.hardware_parameters.find("position_max") != hardware_info.hardware_parameters.end()) {
+    param_position_max_ = std::stod(hardware_info.hardware_parameters.at("position_max"));
+  } else {
+    param_position_max_ = kMaxFingerAngle;
+  }
+  RCLCPP_INFO(rclcpp::get_logger(hardware_info.name),
+              "Position min: %f, Position max: %f", param_position_min_, param_position_max_);
+
+  // Retrieve the threshold parameter for effort
   if (hardware_info.hardware_parameters.find("effort_min") != hardware_info.hardware_parameters.end()) {
     param_effort_min_ = std::stod(hardware_info.hardware_parameters.at("effort_min"));
   } else {
-     // If the parameter does not exist, use the threshold 0.011, which is the actual measurement value of unit 34
+     // If the parameter does not exist, use the threshold 0.011, which is the measured value of unit 34
     param_effort_min_ = 0.011;
   }
 
@@ -147,7 +161,7 @@ hardware_interface::return_type HsrbGripperFakeInterface::read(
 
 hardware_interface::return_type HsrbGripperFakeInterface::write(
     const rclcpp::Time& time, const rclcpp::Duration& /*period*/) {
-  // Obtain grasp flag instructions and current state
+  // Retrieve the instruction for the grasp flag and the current state
   const auto command_grasping_flag = static_cast<int>(command_grasping_flag_);
   const auto state_grasping_flag = static_cast<int>(state_grasping_flag_);
 
@@ -155,10 +169,10 @@ hardware_interface::return_type HsrbGripperFakeInterface::write(
   if (command_grasping_flag != state_grasping_flag) {
     // When the grasp flag is 1
     if (command_grasping_flag == 1) {
-      // The operation is as follows based on the effort value:
-      // 1. Absolute value of effort is greater than the threshold
-      //  1.1. When effort value is positive: Fully open
-      //  1.2. When effort value is negative: Fully closed
+      // The operation is as follows based on the effort value
+      // 1. The absolute value of effort is greater than the threshold
+      //  1.1. When the effort value is positive: fully open
+      //  1.2. When the effort value is negative: fully closed
       if (fabs(command_effort_) > param_effort_min_) {
         if (command_effort_ > 0) {
           state_position_ = 1.0;
@@ -174,21 +188,21 @@ hardware_interface::return_type HsrbGripperFakeInterface::write(
 
   // If there is a difference in value from the previous cycle, update the position value
   if (previous_command_position_ != command_position_) {
-    state_position_ = std::max(KMinFingerAngle, std::min(KMaxFingerAngle, command_position_));
+    state_position_ = std::max(param_position_min_, std::min(param_position_max_, command_position_));
 
-    // Calculate the velocity at the timing when the position is updated
+    // Calculate velocity at the timing of position update
     state_velocity_ = (command_position_ - previous_command_position_)
                       / (time - last_velocity_update_time_).seconds();
     last_velocity_update_time_ = time;
   }
   previous_command_position_ = command_position_;
 
-  // Set velocity to 0 if it hasn't been updated for a certain period
+  // Set velocity to 0 if it has not been updated for a certain period of time
   if ((time - last_velocity_update_time_).seconds() > 1.0) {
     state_velocity_ = 0.0;
   }
 
-  // Perform updates to drive mode
+  // Execute the update of drive mode
   // However, since the simulator side does not have drive_mode settings, only update the status
   const auto command_drive_mode = static_cast<int>(command_drive_mode_);
   if (command_drive_mode >= 0) {
