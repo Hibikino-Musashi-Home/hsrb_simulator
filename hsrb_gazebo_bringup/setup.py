@@ -32,7 +32,7 @@ package_name = 'hsrb_gazebo_bringup'
 
 setup(
     name=package_name,
-    version='2.3.0',
+    version='2.4.0',
     packages=[],
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),

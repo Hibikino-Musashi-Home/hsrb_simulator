@@ -1,0 +1,29 @@
+controller_manager:
+  ros__parameters:
+    motion_command_limitter_controller:
+      type: tmc_realtime_controllers/MotionCommandLimitterController
+
+omni_base_controller:
+  ros__parameters:
+    command_joints:
+      l_wheel: motion_command_limitter_controller/base_l_drive_wheel_joint
+      r_wheel: motion_command_limitter_controller/base_r_drive_wheel_joint
+      steer: motion_command_limitter_controller/base_roll_joint
+    yaw_velocity_limit: 1.8
+    wheel_velocity_limit: 8.5
+
+motion_command_limitter_controller:
+  ros__parameters:
+    joint_names:
+      - base_l_drive_wheel_joint
+      - base_r_drive_wheel_joint
+      - base_roll_joint
+    base_l_drive_wheel_joint:
+      use_command_velocity: true
+      acceleration_limit: 41.7
+    base_r_drive_wheel_joint:
+      use_command_velocity: true
+      acceleration_limit: 41.7
+    base_roll_joint:
+      use_command_velocity: true
+      acceleration_limit: 5.0

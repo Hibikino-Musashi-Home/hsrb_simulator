@@ -57,15 +57,216 @@ DAMAGE.
 
 namespace {
 
-// Speed gain of gripping motion
-constexpr double kGraspVelocityGain = -100.0;
-// Torque allowable error of gripping motion [Nm]
+// Speed gain of the gripping motion
+constexpr double kGraspVelocityGain = 100.0;
+// Torque tolerance error of the gripping motion [Nm]
 constexpr double kGraspEffortTolerance = 0.01;
 
 }  // unnamed namespace
 
 
 namespace hsrb_gz_ros2_control {
+
+void GazeboSimGripperSystem::read(const sim::EntityComponentManager* ecm) {
+  if (!(this->state_interface_)) {
+    return;
+  }
+  this->motor_joint_.joint_position = state_interface_->get_value();
+
+  this->hand_l_spring_proximal_joint_pos_ =
+      ecm->Component<sim::components::JointPosition>(this->hand_l_spring_proximal_joint_)->Data()[0];
+  this->hand_r_spring_proximal_joint_pos_ =
+      ecm->Component<sim::components::JointPosition>(this->hand_r_spring_proximal_joint_)->Data()[0];
+  this->hand_l_spring_proximal_joint_vel_ =
+      ecm->Component<sim::components::JointVelocity>(this->hand_l_spring_proximal_joint_)->Data()[0];
+  this->hand_r_spring_proximal_joint_vel_ =
+      ecm->Component<sim::components::JointVelocity>(this->hand_r_spring_proximal_joint_)->Data()[0];
+
+  const double hand_l_torque = this->hand_l_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
+  const double hand_r_torque = this->hand_r_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
+  this->motor_joint_.joint_effort = -(hand_l_torque + hand_r_torque) / 2.0;
+}
+
+void GazeboSimGripperSystem::write(
+    sim::EntityComponentManager* ecm) {
+  if (!(this->command_interface_)) {
+    return;
+  }
+  // Note that we don't have to take care of mimic joints,
+  // it's handled in mimic joint settings in parent.
+  const double hand_l_torque = this->hand_l_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
+  const double hand_r_torque = this->hand_r_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
+
+  this->drive_mode_ = this->drive_mode_cmd_;
+  if (this->drive_mode_ == tmc_exxx_servo_motor_protocol::kDriveModeHandPosition) {
+    command_interface_->set_value(this->motor_joint_.joint_position_cmd);
+  } else if (this->drive_mode_ == tmc_exxx_servo_motor_protocol::kDriveModeHandGrasp) {
+    command_interface_->set_value(this->motor_joint_.joint_position);
+
+    // TODO(Takeshita) パラメータ調整
+    if (this->grasping_flag_ > 0.0) {
+      const double effort_error = this->motor_joint_.joint_effort - this->motor_joint_.joint_effort_cmd;
+      const double target_velocity = -(this->grasp_velocity_gain_ * effort_error);
+
+      auto vel = ecm->Component<sim::components::JointVelocityCmd>(this->motor_joint_.sim_joint);
+      if (vel == nullptr) {
+        ecm->CreateComponent(
+            this->motor_joint_.sim_joint,
+            sim::components::JointVelocityCmd({target_velocity}));
+      } else if (!vel->Data().empty()) {
+        vel->Data()[0] = target_velocity;
+      }
+
+      if (std::abs(effort_error) < this->grasp_effort_tolerance_) {
+        this->grasping_flag_ = -1.0;
+      }
+    }
+    if (this->grasping_flag_cmd_ > 0.0) {
+      this->grasping_flag_ = 1.0;
+    }
+  }
+
+  // gripper
+  // Not accurate, provisional implementation, vibrates without d
+  constexpr double d_gain = 0.1;
+
+  const double hand_l_torque_cmd = -hand_l_torque - d_gain * this->hand_l_spring_proximal_joint_vel_;
+  if (!ecm->Component<sim::components::JointForceCmd>(this->hand_l_spring_proximal_joint_)) {
+    ecm->CreateComponent(
+        this->hand_l_spring_proximal_joint_,
+        sim::components::JointForceCmd({hand_l_torque_cmd}));
+  } else {
+    const auto cmd = ecm->Component<sim::components::JointForceCmd>(this->hand_l_spring_proximal_joint_);
+    *cmd = sim::components::JointForceCmd({hand_l_torque_cmd});
+  }
+
+  const double hand_r_torque_cmd = -hand_r_torque - d_gain * this->hand_r_spring_proximal_joint_vel_;
+  if (!ecm->Component<sim::components::JointForceCmd>(this->hand_r_spring_proximal_joint_)) {
+    ecm->CreateComponent(this->hand_r_spring_proximal_joint_,
+        sim::components::JointForceCmd({hand_r_torque_cmd}));
+  } else {
+    const auto cmd = ecm->Component<sim::components::JointForceCmd>(this->hand_r_spring_proximal_joint_);
+    *cmd = sim::components::JointForceCmd({hand_r_torque_cmd});
+  }
+}
+
+
+bool GazeboSimGripperSystem::initGripper(
+    const std::map<std::string, sim::Entity>& enableJoints,
+    const hardware_interface::HardwareInfo& hardware_info,
+    const std::string& prefix,
+    std::vector<hardware_interface::CommandInterface>& command_interfaces,
+    std::vector<hardware_interface::CommandInterface>& parent_command_interfaces,
+    std::vector<hardware_interface::StateInterface>& state_interfaces,
+    std::vector<hardware_interface::StateInterface>& parent_state_interfaces) {
+  this->motor_joint_.name = "hand_" + prefix + "motor_joint";
+  this->grasp_velocity_gain_ = kGraspVelocityGain;
+  this->grasp_effort_tolerance_ = kGraspEffortTolerance;
+
+  auto set_joint = [&](const std::string& joint_name, sim::Entity& out_entity) -> bool {
+    auto it = enableJoints.find(joint_name);
+    if (it == enableJoints.end()) {
+      return false;
+    }
+    out_entity = it->second;
+    return true;
+  };
+
+  if (!set_joint(this->motor_joint_.name, this->motor_joint_.sim_joint)) {
+    return false;
+  }
+  if (!set_joint("hand_" + prefix + "left_spring_proximal_joint", this->hand_l_spring_proximal_joint_) &&
+      !set_joint("hand_" + prefix + "l_spring_proximal_joint", this->hand_l_spring_proximal_joint_)) {
+    return false;
+  }
+  if (!set_joint("hand_" + prefix + "right_spring_proximal_joint", this->hand_r_spring_proximal_joint_) &&
+      !set_joint("hand_" + prefix + "r_spring_proximal_joint", this->hand_r_spring_proximal_joint_)) {
+    return false;
+  }
+
+  // Inherit Interface from parent. Remove what was used here
+  for (auto it = parent_command_interfaces.begin(); it != parent_command_interfaces.end(); ++it) {
+    if (it->get_prefix_name() == this->motor_joint_.name &&
+        it->get_interface_name() == hardware_interface::HW_IF_POSITION) {
+      this->command_interface_ = std::make_unique<hardware_interface::CommandInterface>(std::move(*it));
+      break;
+    }
+  }
+  if (!this->command_interface_) {
+    return false;
+  }
+
+  for (auto it = parent_state_interfaces.begin(); it != parent_state_interfaces.end(); ++it) {
+    if (it->get_prefix_name() == this->motor_joint_.name &&
+        it->get_interface_name() == hardware_interface::HW_IF_EFFORT) {
+      // Discard this as it won't be used later
+      auto _ = std::make_unique<hardware_interface::StateInterface>(std::move(*it));
+      break;
+    }
+    if (it->get_prefix_name() == this->motor_joint_.name &&
+        it->get_interface_name() == hardware_interface::HW_IF_POSITION) {
+      this->state_interface_ = std::make_unique<hardware_interface::StateInterface>(std::move(*it));
+      break;
+    }
+  }
+  if (!this->state_interface_) {
+    return false;
+  }
+
+  // define command interfaces
+  command_interfaces.emplace_back(
+      this->motor_joint_.name,
+      hardware_interface::HW_IF_POSITION,
+      &this->motor_joint_.joint_position_cmd);
+  command_interfaces.emplace_back(
+      this->motor_joint_.name,
+      hardware_interface::HW_IF_EFFORT,
+      &this->motor_joint_.joint_effort_cmd);
+  command_interfaces.emplace_back(
+      this->motor_joint_.name, "command_drive_mode", &this->drive_mode_cmd_);
+  command_interfaces.emplace_back(
+      this->motor_joint_.name, "command_grasping_flag", &this->grasping_flag_cmd_);
+
+  // define state interfaces
+  state_interfaces.emplace_back(
+      this->motor_joint_.name,
+      hardware_interface::HW_IF_POSITION,
+      &this->motor_joint_.joint_position);
+  state_interfaces.emplace_back(
+      this->motor_joint_.name,
+      hardware_interface::HW_IF_EFFORT,
+      &this->motor_joint_.joint_effort);
+  state_interfaces.emplace_back(
+      this->motor_joint_.name,
+      "current_drive_mode",
+      &this->drive_mode_);
+  state_interfaces.emplace_back(
+      this->motor_joint_.name,
+      "current_grasping_flag",
+      &this->grasping_flag_);
+  state_interfaces.emplace_back(
+      this->motor_joint_.name,
+      "current",
+      &this->current_);
+
+  auto it = std::find_if(
+      hardware_info.joints.begin(), hardware_info.joints.end(),
+      [&](const auto& joint) {
+        return joint.name == this->motor_joint_.name;
+      });
+
+  if (it != hardware_info.joints.end()) {
+    auto gain_param = it->parameters.find("grasp_velocity_gain");
+    if (gain_param != it->parameters.end()) {
+      this->grasp_velocity_gain_ = std::stod(gain_param->second);
+    }
+    auto tolerance_param = it->parameters.find("grasp_effort_tolerance");
+    if (tolerance_param != it->parameters.end()) {
+      this->grasp_effort_tolerance_ = std::stod(tolerance_param->second);
+    }
+  }
+  return true;
+}
 
 bool GazeboSimSystem::initSim(
     rclcpp::Node::SharedPtr& model_nh,
@@ -79,94 +280,48 @@ bool GazeboSimSystem::initSim(
     this->parent_ = std::unique_ptr<gz_ros2_control::GazeboSimSystemInterface>(
         this->gz_system_loader_.createUnmanagedInstance("gz_ros2_control/GazeboSimSystem"));
   } catch (pluginlib::PluginlibException &ex) {
-    RCLCPP_ERROR(
-        this->nh_->get_logger(),
+    RCLCPP_ERROR(this->nh_->get_logger(),
         "The plugin failed to load for some reason. Error: %s\n", ex.what());
     return false;
   }
 
   this->ecm_ = &_ecm;
-  this->hand_l_spring_proximal_joint_ = enableJoints["hand_l_spring_proximal_joint"];
-  this->hand_r_spring_proximal_joint_ = enableJoints["hand_r_spring_proximal_joint"];
-
-  this->grasp_velocity_gain_ = kGraspVelocityGain;
-  this->grasp_effort_tolerance_ = kGraspEffortTolerance;
-
   this->parent_->initSim(model_nh, enableJoints, hardware_info, _ecm, update_rate);
 
-  {
-    this->motor_joint_.name = "hand_motor_joint";
-    this->motor_joint_.sim_joint = enableJoints[this->motor_joint_.name];
+  auto parent_command_interfaces = this->parent_->export_command_interfaces();
+  auto parent_state_interfaces = this->parent_->export_state_interfaces();
 
-    // define command interfaces
-    this->command_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        hardware_interface::HW_IF_POSITION,
-        &this->motor_joint_.joint_position_cmd);
-    this->command_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        hardware_interface::HW_IF_EFFORT,
-        &this->motor_joint_.joint_effort_cmd);
-    this->command_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        "command_drive_mode",
-        &this->drive_mode_cmd_);
-    this->command_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        "command_grasping_flag",
-        &this->grasping_flag_cmd_);
-
-    // define state interfaces
-    this->state_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        hardware_interface::HW_IF_POSITION,
-        &this->motor_joint_.joint_position);
-    this->state_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        hardware_interface::HW_IF_EFFORT,
-        &this->motor_joint_.joint_effort);
-    this->state_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        "current_drive_mode",
-        &this->drive_mode_);
-    this->state_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        "current_grasping_flag",
-        &this->grasping_flag_);
-    this->state_interfaces_.emplace_back(
-        this->motor_joint_.name,
-        "current",
-        &this->current_);
+  // TODO(MasayukiMasuda): configなど読み込んで必要なものだけ立ち上げるようにする
+  const std::vector<std::string> prefixes = {"", "right_", "left_"};
+  for (const auto& prefix : prefixes) {
+    auto gripper_system = std::make_unique<GazeboSimGripperSystem>();
+    if (gripper_system->initGripper(
+        enableJoints,
+        hardware_info,
+        prefix,
+        this->command_interfaces_,
+        parent_command_interfaces,
+        this->state_interfaces_,
+        parent_state_interfaces)) {
+      this->gripper_systems_.push_back(std::move(gripper_system));
+    } else {
+      RCLCPP_WARN(this->nh_->get_logger(), "Joint with prefix '%s' not found in enableJoints.", prefix.c_str());
+      RCLCPP_WARN(this->nh_->get_logger(), "Will NOT add this empty joint to gripper system.");
+    }
   }
 
-  for (auto& command_interface : this->parent_->export_command_interfaces()) {
-    if (command_interface.get_prefix_name() == this->motor_joint_.name &&
-        command_interface.get_interface_name() == hardware_interface::HW_IF_POSITION) {
-      parent_motor_position_command_.push_back(std::move(command_interface));
+  // Skip moved elements and inherit the remaining Interface from parent
+  for (auto& command_interface : parent_command_interfaces) {
+    if (command_interface.get_prefix_name().empty()) {
       continue;
     }
     this->command_interfaces_.push_back(std::move(command_interface));
   }
-  if (parent_motor_position_command_.empty()) {
-    RCLCPP_ERROR(this->nh_->get_logger(), "Failed to get parent motor position command interface");
-    return false;
-  }
-
-  for (auto& state_interface : this->parent_->export_state_interfaces()) {
-    if (state_interface.get_prefix_name() == this->motor_joint_.name &&
-        state_interface.get_interface_name() == hardware_interface::HW_IF_EFFORT) {
-      continue;
-    }
-    if (state_interface.get_prefix_name() == this->motor_joint_.name &&
-        state_interface.get_interface_name() == hardware_interface::HW_IF_POSITION) {
-      parent_motor_position_state_.push_back(std::move(state_interface));
+  for (auto& state_interface : parent_state_interfaces) {
+    if (state_interface.get_prefix_name().empty()) {
       continue;
     }
     this->state_interfaces_.push_back(std::move(state_interface));
-  }
-  if (parent_motor_position_state_.empty()) {
-    RCLCPP_ERROR(this->nh_->get_logger(), "Failed to get parent motor position state interface");
-    return false;
   }
 
   for (const auto& joint : hardware_info.joints) {
@@ -180,17 +335,8 @@ bool GazeboSimSystem::initSim(
         saturation.lower = axis.Lower();
         this->joint_saturations_.push_back(saturation);
       }
-      if ((joint.name == "hand_motor_joint") &&
-          (param.first == "grasp_velocity_gain")) {
-        this->grasp_velocity_gain_ = std::stod(param.second.c_str());
-      }
-      if ((joint.name == "hand_motor_joint") &&
-          (param.first == "grasp_effort_tolerance")) {
-        this->grasp_effort_tolerance_ = std::stod(param.second.c_str());
-      }
     }
   }
-
   return true;
 }
 
@@ -226,20 +372,9 @@ hardware_interface::return_type GazeboSimSystem::read(
     return ret;
   }
 
-  this->motor_joint_.joint_position = parent_motor_position_state_[0].get_value();
-
-  this->hand_l_spring_proximal_joint_pos_ =
-    this->ecm_->Component<sim::components::JointPosition>(this->hand_l_spring_proximal_joint_)->Data()[0];
-  this->hand_r_spring_proximal_joint_pos_ =
-    this->ecm_->Component<sim::components::JointPosition>(this->hand_r_spring_proximal_joint_)->Data()[0];
-  this->hand_l_spring_proximal_joint_vel_ =
-    this->ecm_->Component<sim::components::JointVelocity>(this->hand_l_spring_proximal_joint_)->Data()[0];
-  this->hand_r_spring_proximal_joint_vel_ =
-    this->ecm_->Component<sim::components::JointVelocity>(this->hand_r_spring_proximal_joint_)->Data()[0];
-
-  const double hand_l_torque = this->hand_l_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
-  const double hand_r_torque = this->hand_r_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
-  this->motor_joint_.joint_effort = -(hand_l_torque + hand_r_torque) / 2.0;
+  for (auto& gripper_system : this->gripper_systems_) {
+    gripper_system->read(this->ecm_);
+  }
   return ret;
 }
 
@@ -252,37 +387,10 @@ hardware_interface::return_type GazeboSimSystem::perform_command_mode_switch(
 hardware_interface::return_type GazeboSimSystem::write(
     const rclcpp::Time& time,
     const rclcpp::Duration& period) {
-  const double hand_l_torque = this->hand_l_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
-  const double hand_r_torque = this->hand_r_spring_proximal_joint_pos_ * this->hand_spring_coeff_;
-
   const auto result = this->parent_->write(time, period);
 
-  this->drive_mode_ = this->drive_mode_cmd_;
-  if (this->drive_mode_ == tmc_exxx_servo_motor_protocol::kDriveModeHandPosition) {
-    parent_motor_position_command_[0].set_value(this->motor_joint_.joint_position_cmd);
-  } else if (this->drive_mode_ == tmc_exxx_servo_motor_protocol::kDriveModeHandGrasp) {
-    parent_motor_position_command_[0].set_value(this->motor_joint_.joint_position);
-
-    // TODO(Takeshita) パラメータ調整
-    if (this->grasping_flag_ > 0.0) {
-      const double effort_error = this->motor_joint_.joint_effort - this->motor_joint_.joint_effort_cmd;
-      const double target_velocity = -(this->grasp_velocity_gain_ * effort_error);
-
-      auto vel = this->ecm_->Component<sim::components::JointVelocityCmd>(this->motor_joint_.sim_joint);
-      if (vel == nullptr) {
-        this->ecm_->CreateComponent(this->motor_joint_.sim_joint,
-                                    sim::components::JointVelocityCmd({target_velocity}));
-      } else if (!vel->Data().empty()) {
-        vel->Data()[0] = target_velocity;
-      }
-
-      if (std::abs(effort_error) < this->grasp_effort_tolerance_) {
-        this->grasping_flag_ = -1.0;
-      }
-    }
-    if (this->grasping_flag_cmd_ > 0.0) {
-      this->grasping_flag_ = 1.0;
-    }
+  for (auto& gripper_system : this->gripper_systems_) {
+    gripper_system->write(this->ecm_);
   }
 
   constexpr double kJointResetPosition = 1.0e-4;
@@ -300,36 +408,13 @@ hardware_interface::return_type GazeboSimSystem::write(
     if (reset_position.has_value()) {
       auto command_position = this->ecm_->Component<sim::components::JointPositionReset>(saturation.joint);
       if (command_position == nullptr) {
-        this->ecm_->CreateComponent(saturation.joint,
-                                    sim::components::JointPositionReset({reset_position.value()}));
+        this->ecm_->CreateComponent(
+            saturation.joint, sim::components::JointPositionReset({reset_position.value()}));
       } else {
         command_position->Data()[0] = reset_position.value();
       }
     }
   }
-
-  // gripper
-  // Not accurate, provisional implementation, will vibrate without d
-  constexpr double d_gain = 0.1;
-
-  const double hand_l_torque_cmd = -hand_l_torque - d_gain * this->hand_l_spring_proximal_joint_vel_;
-  if (!this->ecm_->Component<sim::components::JointForceCmd>(this->hand_l_spring_proximal_joint_)) {
-    this->ecm_->CreateComponent(this->hand_l_spring_proximal_joint_,
-                                sim::components::JointForceCmd({hand_l_torque_cmd}));
-  } else {
-    const auto cmd = this->ecm_->Component<sim::components::JointForceCmd>(this->hand_l_spring_proximal_joint_);
-    *cmd = sim::components::JointForceCmd({hand_l_torque_cmd});
-  }
-
-  const double hand_r_torque_cmd = -hand_r_torque - d_gain * this->hand_r_spring_proximal_joint_vel_;
-  if (!this->ecm_->Component<sim::components::JointForceCmd>(this->hand_r_spring_proximal_joint_)) {
-    this->ecm_->CreateComponent(this->hand_r_spring_proximal_joint_,
-                                sim::components::JointForceCmd({hand_r_torque_cmd}));
-  } else {
-    const auto cmd = this->ecm_->Component<sim::components::JointForceCmd>(this->hand_r_spring_proximal_joint_);
-    *cmd = sim::components::JointForceCmd({hand_r_torque_cmd});
-  }
-
   return result;
 }
 }  // namespace hsrb_gz_ros2_control

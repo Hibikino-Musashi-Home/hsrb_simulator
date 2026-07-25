@@ -71,29 +71,33 @@ class HsrbGripperFakeInterface : public hardware_interface::SystemInterface {
   double state_velocity_;
   // current effort
   double state_effort_;
-  // current drive mode value
+  // current drive mode
   double state_drive_mode_;
-  // current grasping flag value
+  // current grasping flag
   double state_grasping_flag_;
   // current value
   double state_current_;
 
-  // commanded position
+  // position command value
   double command_position_;
-  // commanded effort
+  // effort command value
   double command_effort_;
-  // commanded drive mode value
+  // drive mode command value
   double command_drive_mode_;
-  // commanded grasping flag value
+  // grasping flag command value
   double command_grasping_flag_;
 
-  // previous cycle commanded position
+  // previous cycle position command value
   double previous_command_position_;
 
+  // minimum position value
+  double param_position_min_;
+  // maximum position value
+  double param_position_max_;
   // effort threshold
   double param_effort_min_;
 
-  // time of last velocity update
+  // last time velocity was updated
   rclcpp::Time last_velocity_update_time_;
 };
 
